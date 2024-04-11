@@ -1,0 +1,66 @@
+-how to determine which path to take?
+-how do enemies know how to reach the player?
+	-they will need to know which section the player is in = represented by NEW section tiles
+	-they need to know which section they are in = represented by NEW section tiles
+	-they need to know how to move to another section = represented by pathfinding tiles???
+		-need to know how to move to a particular section from a given section
+		-manually create sections per scene, each section will be numbered
+-can area detection contain decimals? No, but can use negative numbers
+
+
+SECTION TILES
+-section tiles need to indicate number
+-how does x and y affect section numbering???
+	-even sections indicate horizontally linked
+	-odd sections indicate vertically linked
+	-bottom left of scene is this xy axis origin
+-how does each section store "linked" sections? If enemy is in section 4, how does it know where the linked sections are???
+-if player is in a lower number section, then enemies will move to the lowest section possible
+
+
+LINK TILES  (direction tiles)
+-instead of showing the direction enemies need to take, they show the linked sections' numbers
+-
+
+-bfs, start from destination/origin and find all possible paths 
+-draw the map, find all possible nodes
+	-find floors, will have area detection number 10
+	-ladder top will be area detection number 12
+	-ladder bottom will be area detection number 11
+	-find nodes, sections on the map where the tiles have at least two viable directions, always involves ladders, so ladder top or ladder bottom are node spots
+	-travel along floors 
+	-
+-cannot use an actual unit to perform bfs, cannot efficiently save parent's steps 
+-bfs, may be viable with nodes
+-map ladder nodes, dead end nodes, and floors
+-find shortest path to player location
+
+
+var tileWdth = Agtk.settings.tileWidth
+var tileHght = Agtk.settings.tileHeight
+
+var sceneWdth = Agtk.scenes.getById(id).horzScreenCount
+var sceneHght = Agtk.settings.screenHeight
+
+Agtk.sceneInstances.getCurrent().sceneId;
+
+
+
+	var sceneId = Agtk.sceneInstances.getCurrent().sceneId;
+	var temp = Agtk.settings.screenWidth;
+	//var scene = Agtk.scenes.get;
+	//var sceneWdth = scene.id;
+	return sceneId;
+Agtk.log ("top: " + Agtk.constants.tile.WallTopBit + "/n" + "left: " + Agtk.constants.tile.WallLeftBit + "/n" + "right: " + Agtk.constants.tile.WallRightBit + "/n" + "bottom: " + Agtk.constants.tile.WallBottomBit);
+
+TileWallBits
+top - 3
+left - 1
+right - 5
+bottom - 0
+
+-WTH IS TILESET ID
+	-it is the ID of the tile spreadsheet
+	-the xy coord from the tileset object points to the tile location on the spread sheet
+
+
