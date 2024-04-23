@@ -7,7 +7,7 @@
         gravity: 50,
         mapObject: [],
         list: [],
-        range: 3,
+        range: 5,
         ladderWallId: 7,
 
         pathingMovement: {
@@ -22,10 +22,7 @@
         mapScene: function(){
             // find all tiles and map them into a 2D array.
             var scene = Agtk.scenes.get(Agtk.sceneInstances.getCurrent().sceneId);
-            var layer = scene.getLayerById(scene.getLayerIdByName("Layer 2"));//-----------------------------------------
             var tileset;
-            var wallDetect;
-
             var widthVar = scene.horzScreenCount * Agtk.settings.screenWidth / Agtk.settings.tileWidth;
             var heightVar = scene.vertScreenCount * Agtk.settings.screenHeight / Agtk.settings.tileHeight;
             //create xy graph object and store array of scene there
@@ -187,133 +184,6 @@
                 }           
             }                  
         },
-        
-        // a different iteration of the original pathfinding model, this one does not rely on an existing map of the scene
-        findRoute2: function(instanceId) {
-            var scene = Agtk.scenes.get(Agtk.sceneInstances.getCurrent().sceneId);
-            var map = {
-                widthVar: scene.horzScreenCount * Agtk.settings.screenWidth / Agtk.settings.tileWidth,
-                heightVar: scene.vertScreenCount * Agtk.settings.screenHeight / Agtk.settings.tileHeight,
-            }
-
-            // this finds the unit's current xy tile coord
-            var self = Agtk.objectInstances.get(instanceId).variables;
-            var xinit = Math.floor(self.get(self.XId).getValue() / Agtk.settings.tileWidth);
-            var yinit = Math.floor(self.get(self.YId).getValue() / Agtk.settings.tileHeight);
-            
-            // Create visited list and toVisit queue. 
-            var queue = [];
-            var list =[];
-            
-            // Initialize arrays and variables
-            queue.push({
-                x: xinit, 
-                y: yinit,
-            });
-            list.push({
-                x: xinit, 
-                y: yinit,
-                parentx: xinit,
-                parenty: yinit,
-            });
-            Agtk.log(xinit + ", " + yinit);
-            // this.mapObject[xinit][yinit].visitCondition = true;
-            var currentTile = {
-                x: xinit, 
-                y: yinit,
-            };
-
-            // Locate player
-            var player = Agtk.objectInstances.get(Agtk.objectInstances.getIdByName(-1, "Player Body")).variables;
-            var playerCoord = {
-                x: Math.floor(player.get(player.XId).getValue() / Agtk.settings.tileWidth),
-                y: Math.floor(player.get(player.YId).getValue() / Agtk.settings.tileHeight),
-            }
-            Agtk.log("PLAYER LOCATION: " + playerCoord.x + "," + playerCoord.y);            
-
-            // initialize pathfinder starting location
-            this.initPathfinder(list, currentTile);
-            
-            // while loop
-            while (queue.length != 0 && !(Math.abs(currentTile.x - playerCoord.x) <= 0 && (currentTile.y - playerCoord.y) <= 0)) {
-                currentTile = queue.shift();   
-                // this.pathfinder(queue, list, playerCoord, instanceId, currentTile, map);
-                this.pathfinder2(queue, list, playerCoord, instanceId, currentTile, map);
-            }
-            // this.retraceSteps(list);
-            Agtk.log("Finished running findRoute--------" + queue.length)  
-        },
-
-        // different iteration of the original pathfinding model. Still slightly freezes the game
-        pathfinder2: function(queue, list, playerCoord, instanceId, currentTile, map) {
-            // IF TILE BELOW CURRENT TILE IS AN UNVISITED AIR TILE, THEN WE MUST FALL DOWN
-            var falling = {
-                x: 0,
-                y: 1,
-            }
-            var sceneHeight = map.heightVar;            
-            while (currentTile.y + falling.y < sceneHeight) {
-                var sum = currentTile.y + falling.y;
-                // need to check coord for being within map scene
-                if (!this.isTileVisited(currentTile.x, sum, list) && this.getTileInfo(currentTile.x, sum) == -1) {
-                    this.pushTile(queue, list, {x: currentTile.x, y: sum}, currentTile);
-                    currentTile.y = sum;
-                } else {
-                    break;
-                }
-            }          
-
-            // Find nearby tiles. Do not take diagonal tiles since their distances are greater than 1. 
-            // add a new variable: wall spacing that determines how far away enemies will stay away from walls
-            var nextTile = [{direction: this.pathingMovement.moveLeft, x: (currentTile.x - 1), y: currentTile.y, wallSpace: (-3),}, 
-                            {direction: this.pathingMovement.moveRight, x: (currentTile.x + 1), y: currentTile.y, wallSpace: (3),}, 
-                            {direction: this.pathingMovement.climbUp, x: currentTile.x, y: (currentTile.y - 1)}, 
-                            {direction: this.pathingMovement.climbDown, x: currentTile.x, y: (currentTile.y + 1)}];
-            // Agtk.log("Current tile: " + currentTile.x + "," + currentTile.y);
-
-            for (var i = 0; (i < nextTile.length) && (this.isWithinScene(nextTile[i].x, nextTile[i].y, map)); i++) {
-                // move left or right
-                // detects ladder (wallId = 7)
-                switch (nextTile[i].direction) {
-                    case this.pathingMovement.climbUp:
-                        // climb up ladders
-                        if (!this.isTileVisited(nextTile[i].x, nextTile[i].y, list) && this.getTileInfo(nextTile[i].x, nextTile[i].y) == this.ladderWallId) {
-                            this.pushTile(queue, list, nextTile[i], currentTile);
-                        }
-                        
-                        // check for jump tiles only if current tile is above the floor
-                        // Agtk.log("next tile: " + nextTile[i].x + "," + nextTile[3].y);
-                        if (this.isWithinScene(currentTile.x, nextTile[3].y, map)){
-                            if (this.getTileInfo(currentTile.x, nextTile[3].y) % 2 == 1 && this.getTileInfo(nextTile[i].x, nextTile[i].y) == -1) {
-                                this.pushJumpTiles(queue, list, nextTile[i], currentTile, map, instanceId);  
-                            }
-                        } 
-                        
-                    break;
-                    case this.pathingMovement.climbDown:
-                        // if unit encounters ladders below, climb down ladders
-                        if (!this.isTileVisited(nextTile[i].x, nextTile[i].y, list) && this.getTileInfo(nextTile[i].x, nextTile[i].y) == this.ladderWallId) {
-                            this.pushTile(queue, list, nextTile[i], currentTile);
-                        }
-                    break;
-                    default:
-                        // move left or right
-                        // detects ladder (wallId = 7)
-                        if (!this.isTileVisited(nextTile[i].x, nextTile[i].y, list) 
-                        && (this.getTileInfo(nextTile[i].x, nextTile[i].y) == -1 || this.getTileInfo(nextTile[i].x, nextTile[i].y) == this.ladderWallId)) {
-                            this.pushTile(queue, list, nextTile[i], currentTile);
-                        }
-                    break;
-                }            
-                if (Math.abs(nextTile[i].x - playerCoord.x) <= 0 && (nextTile[i].y - playerCoord.y) <= 0) {
-                    Agtk.log("I found the player!" + nextTile[i].x + ", " + nextTile[i].y);
-                    currentTile.x = nextTile[i].x;
-                    currentTile.y = nextTile[i].y;
-                    this.retraceSteps(list);
-                    break;
-                }           
-            }                  
-        },
 
         // Retrace our steps to find our actual path 
         retraceSteps: function (list, instanceId){
@@ -437,10 +307,6 @@
             return (0 <= xCoord && 0 <= yCoord && xCoord < map.length && yCoord < map[0].length)
         },
 
-        isWithinScene2: function(xCoord, yCoord, map) {
-            return (0 <= xCoord && 0 <= yCoord && xCoord < map.widthVar && yCoord < map.heightVar)
-        },
-
         initPathfinder: function(list, currentTile) {
             var falling = {
                 x: 0,
@@ -466,28 +332,7 @@
             } 
         },
 
-        initPathfinder2: function(list, currentTile) {
-            var falling = {
-                x: 0,
-                y: 1,
-            }
-            var scene = Agtk.scenes.get(Agtk.sceneInstances.getCurrent().sceneId);
-            var sceneHeight = scene.vertScreenCount * Agtk.settings.screenHeight / Agtk.settings.tileHeight;
-            
-            while (currentTile.y + falling.y < sceneHeight) {
-                // SHOULD FALLING REMEMBER TILES??????????????? no, can block jump paths
-                var sum = currentTile.y + falling.y;
-                // needs to check coord for being within map scene
-                if (!this.isTileVisited(currentTile.x, sum, list)
-                && this.getTileInfo(currentTile.x, sum) == -1) {
-                    currentTile.y = sum;
-                } else {
-                    break;
-                }
-            } 
-        },
-
-        moveTo: function(instanceId, list) {
+        moveToLocation: function(instanceId, list) {
             // coord with common x or y values will be removed from pathing list so we will only have a list of nodes where we change directions
             // unit is to move to coord
             // unit will climb ladders when required
@@ -552,7 +397,6 @@
                         if (this.isWallContact(8, instanceId)) {
                             distance = 1;
                         }
-                        Agtk.log("moving down ran here++++++++++" + distance)
                         var args = {
                             "distanceOverride": true,
                             "moveDistance": Math.abs(distance * Agtk.settings.tileWidth),
@@ -565,24 +409,18 @@
                         break;
                 }
     
-                // Agtk.log("direction is: " + direction + " at location: " + self.x + ", " + self.y + " at distance of: " + xdistance);
+                Agtk.log("direction is: " + direction + " at location: " + self.x + ", " + self.y + " at distance of: " + xdistance);
                 var range = 0;//this.range;
-
-                // if (nextTile.direction == this.pathingMovement.jump) {
-                //     range = this.range;
-                // }
-                var self = this.getCurrentLocation(instanceId);
-
                 // when unit reaches the tile, push the next tile to the front
                 if (currentTile.direction == this.pathingMovement.moveLeft 
-                    && ((self.x - nextTile.x) <= range || this.isWallContact(6, instanceId)
+                    && (xdistance > range || this.isWallContact(6, instanceId)
                         || (nextTile.direction == this.pathingMovement.jump && xdistance >= -this.range)
                     )) {
                         Agtk.log("was moving left, now shifting list at: " + self.x + ", " + self.y);
                         list.shift();
                 }
                 if (currentTile.direction == this.pathingMovement.moveRight 
-                    && ((self.x - nextTile.x) >= range || this.isWallContact(6, instanceId)
+                    && (xdistance < range || this.isWallContact(6, instanceId)
                         || (nextTile.direction == this.pathingMovement.jump && xdistance <= this.range)
                     )) {
                         Agtk.log("was moving right, now shifting list at: " + self.x + ", " + self.y);
@@ -606,7 +444,7 @@
                     list.shift();
                 }
             } else if (list.length == 1) {
-                Agtk.log("pathfinder list of coordinates only had 1 index. Assuming the unit has found the player and now will stop the moveTo() function.");
+                Agtk.log("pathfinder list of coordinates only had 1 index. Assuming the unit has reached location and now will stop the moveTo() function.");
                 currentTile = list.shift();
                 var distance = this.getCurrentLocation(instanceId).x - currentTile.x;
                 Agtk.log("distance: "+distance)
@@ -658,6 +496,17 @@
         isTileVisited: function(x, y){
             return this.mapObject[x][y].visitCondition;
         },
+
+        moveDistance: function(instanceId, destination) {
+            var distance = this.getCurrentLocation(instanceId).x - destination.x;
+                var args = {
+                    "distanceOverride": true,
+                    "moveDistance": Math.abs(distance * Agtk.settings.tileWidth),
+                    "reverse": false
+                }
+                Agtk.log("moving distance is: " + distance);
+                Agtk.objectInstances.get(instanceId).execCommandDisplayDirectionMove(args);
+        },
     }
 	
 
@@ -684,12 +533,11 @@
             // # The process is defined in obj.execActionCommand
             // return []; // if you don't use
             return [
-                {id: 1, name: 'Map the scene', description: 'Finds all the tiles in layers 2 and 3 and remembers their wall detection.', 
-                parameter: [{id: 1, name: 'Description:', type: 'Array', defaultValue: []}]},
-                {id: 2, name: 'Find route to player', description: 'Find the shortest route to the player. This is the basic pathfinding algorithm.', 
-                parameter: [{id: 2, name: 'Description', type: 'Array', defaultValue: []}]},
-                {id: 3, name: 'Move to location', description: 'Moves the unit. Requires running Find route to player.', 
-                parameter: [{id: 2, name: 'Description', type: 'Array', defaultValue: []}]},
+                {id: 1, name: 'Map the scene', description: 'Finds all the tiles in layers 2 and 3 and remembers their wall detection.'},
+                {id: 2, name: 'Find route to player', description: 'Find the shortest route to the player. This is the basic pathfinding algorithm.'}, 
+                {id: 3, name: 'Pathfinding to location', description: 'Unit moves along the path to location. Requires running Find route to player.'},
+                {id: 4, name: 'Travel jump distance', description: 'Handles unit jump distance. Requires running Find route to player. WIP: allow user to select location coord.', 
+                parameter: [{id: 1, name: 'X Coord', type: 'Number', minimumValue: 0, defaultValue: 0}, {id: 2, name: 'Y Coord', type: 'Number', minimumValue: 0, defaultValue: 0}]},
             ];
         } else if(category == 'linkCondition'){
             // # Parameters of link conditions.
@@ -744,9 +592,12 @@
                 break;
             case 3:         
                 if (global.list.length != 0 && global.list.get(instanceId) != 0) {
-                    global.moveTo(instanceId, global.list.get(instanceId));
+                    global.moveToLocation(instanceId, global.list.get(instanceId));
                     return Agtk.constants.actionCommands.commandBehavior.CommandBehaviorLoop;
                 }
+                break;
+            case 4:
+                global.moveDistance(instanceId, global.list.get(instanceId)[1]);
                 break;
         }
         // # The behavior of the action after executing the command is selected.
@@ -760,95 +611,60 @@
         switch(paramId){
             case 1: 
                 var list = global.list.get(instanceId);
+                var self = global.getCurrentLocation(instanceId);
                 // checks if player can jump, will need to account for changing directions when jumping (e.g. moving right then jumping to the left side of a platform above)
                 if (list.length > 1) {
-                    var self = global.getCurrentLocation(instanceId);
                     var jumpTile = list[0];
                     var landingTile = list[1];
                     var directions = global.pathingMovement.climbUp;
+                    var range = global.range;
+                    if (jumpTile.direction == global.pathingMovement.jump && global.isWallContact(8, instanceId)) {
+                        // jumping 
+                        if (landingTile.direction == global.pathingMovement.moveLeft
+                            && ((jumpTile.x - self.x) <= -range)) {
+                                Agtk.log("reverse left jump, at: " + + self.x + ", " + self.y + " direction: ");
+                                directions = global.pathingMovement.moveLeft;  
+                                var args = {
+                                    "direction": directions,
+                                    "directionId": -2,
+                                    "moveDistance": 0,
+                                    "moveDistanceEnabled": false,
+                                }    
+                                Agtk.objectInstances.get(instanceId).execCommandDirectionMove(args);
+                                list.shift();
+                                return true;          
+                        }
 
-                // if (list[0].direction != global.pathingMovement.fallDown 
-                //     && list[1].direction != global.pathingMovement.fallDown 
-                //     && !global.isWallAhead(8, instanceId) 
-                //     && global.isWallContact(8, instanceId)) {
-                //         var args = {
-                //             "distanceOverride": false,
-                //             "moveDistance": 0,
-                //             "reverse": false,
-                //         }
-                //         Agtk.objectInstances.get(instanceId).execCommandDisplayDirectionMove(args);
-                //         return true;
-                //     }
-
-                if (jumpTile.direction == global.pathingMovement.jump && global.isWallContact(8, instanceId)) {
-
-                    // jumping forward
-                    // if (landingTile.direction == global.pathingMovement.moveRight 
-                    //     // && isFacingRight
-                    //     && (self.x - jumpTile.x) >= -range) {
-                    //     Agtk.log("forward right jump, at: " + self.x + ", " + self.y + " direction: " + isFacingRight);
-                    //     directions = global.pathingMovement.moveRight;   
-                    //     var args = {
-                    //         "direction": directions,
-                    //         "directionId": -2,
-                    //         "moveDistance": 0,
-                    //         "moveDistanceEnabled": false,
-                    //     }    
-                    //     Agtk.objectInstances.get(instanceId).execCommandDirectionMove(args);
-                    //     list.shift();
-                    //     return true;  
-                    // }
-
-                    // if (landingTile.direction == global.pathingMovement.moveLeft 
-                    //     // && !isFacingRight
-                    //     && (self.x - jumpTile.x) <= range) {
-                    //     Agtk.log("forward left jump, at: " + + self.x + ", " + self.y + " direction: " + isFacingRight);
-                    //     directions = global.pathingMovement.moveLeft;   
-                    //     var args = {
-                    //         "direction": directions,
-                    //         "directionId": -2,
-                    //         "moveDistance": 50000,
-                    //         "moveDistanceEnabled": false,
-                    //     }    
-                    //     Agtk.objectInstances.get(instanceId).execCommandDirectionMove(args);
-                    //     list.shift();
-                    //     return true;  
-                    // }
-
-                    // jumping 
-                    if (landingTile.direction == global.pathingMovement.moveLeft
-                        // && isFacingRight
-                        && ((self.x - jumpTile.x) >= global.range)) {
-                            Agtk.log("reverse left jump, at: " + + self.x + ", " + self.y + " direction: " + isFacingRight);
-                            directions = global.pathingMovement.moveLeft;  
-                            var args = {
-                                "direction": directions,
-                                "directionId": -2,
-                                "moveDistance": 0,
-                                "moveDistanceEnabled": false,
-                            }    
-                            Agtk.objectInstances.get(instanceId).execCommandDirectionMove(args);
-                            list.shift();
-                            return true;          
+                        if (landingTile.direction == global.pathingMovement.moveRight 
+                            && ((self.x - jumpTile.x) <= -range )) {
+                                Agtk.log("reverse right jump, at: " + + self.x + ", " + self.y + " direction: ")
+                                directions = global.pathingMovement.moveRight;   
+                                var args = {
+                                    "direction": directions,
+                                    "directionId": -2,
+                                    "moveDistance": 0,
+                                    "moveDistanceEnabled": false,
+                                }    
+                                Agtk.objectInstances.get(instanceId).execCommandDirectionMove(args);
+                                list.shift();
+                                return true;                                       
+                        }
                     }
-
-                    if (landingTile.direction == global.pathingMovement.moveRight 
-                        // && !isFacingRight
-                        && ((self.x - jumpTile.x) <= -global.range )) {
-                            Agtk.log("reverse right jump, at: " + + self.x + ", " + self.y + " direction: " + isFacingRight)
-                            directions = global.pathingMovement.moveRight;   
-                            var args = {
-                                "direction": directions,
-                                "directionId": -2,
-                                "moveDistance": 0,
-                                "moveDistanceEnabled": false,
-                            }    
-                            Agtk.objectInstances.get(instanceId).execCommandDirectionMove(args);
+                }       
+                // due to current pathfinder algorithm, units prefer to fall down and jump immediately back up instead of just jumping over gaps that have a platform below
+                if (list.length >= 3) {
+                    if (list[0].direction == global.pathingMovement.fallDown 
+                        && list[2].direction == global.pathingMovement.jump 
+                        && Math.abs(list[2].x - list[0].x) <= 15
+                        && Math.abs(self.x - list[0].x) <= 1
+                    ) {
+                            Agtk.log("jumping over a small gap at " + self.x + ", " + self.y);
                             list.shift();
-                            return true;                                       
+                            list.shift();
+                            list.shift();
+                            return true;  
                     }
-                }
-                }         
+                }  
                 break;
             case 2: // # id: 2
                 Agtk.log("[LinkCondition2] is executed.");
