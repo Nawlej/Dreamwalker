@@ -6,11 +6,12 @@
 
         gravity: 50,
         mapObject: [],
+        unitMapObject:[],
         list: [],
         direction: [],
         range: 5,
-        ladderWallId: 7,
-        jumpHeight: 17,
+        ladderWallId: "LADDER",
+        jumpRange: 17,
 
         movement: {
             moveLeft: 270,
@@ -38,15 +39,21 @@
                 for (var x = 0; x < widthVar; x++) {
                     // check if tileset will be null
                     if (scene.getLayerById(scene.getLayerIdByName("Layer 2")).getTileInfo(x, y)) {
-                        tileset = scene.getLayerById(scene.getLayerIdByName("Layer 2")).getTileInfo(x, y)
+                        tileset = scene.getLayerById(scene.getLayerIdByName("Layer 2")).getTileInfo(x, y);
+                        var wallID = Agtk.tilesets.get(tileset.tilesetId).getWallBits(tileset.x, tileset.y)
+
+                        if (Agtk.tilesets.get(tileset.tilesetId).name.contains(this.ladderWallId)) {
+                            wallID = this.ladderWallId;
+                        }
                         map[x][y] = {
-                            wallID: Agtk.tilesets.get(tileset.tilesetId).getWallBits(tileset.x, tileset.y),
+                            wallID: wallID,
                             visitCondition: false,
                         }                    
                     } else if (scene.getLayerById(scene.getLayerIdByName("Layer 3")).getTileInfo(x, y)) {
                         tileset = scene.getLayerById(scene.getLayerIdByName("Layer 3")).getTileInfo(x, y);
+                        Agtk.log("ladder tile name: " + Agtk.tilesets.get(tileset.tilesetId).name);
                         map[x][y] = {
-                            wallID: Agtk.tilesets.get(tileset.tilesetId).getWallBits(tileset.x, tileset.y),
+                            wallID: this.ladderWallId,
                             visitCondition: false,
                         }
                     } else {
@@ -59,6 +66,7 @@
             }
             Agtk.log("mapScene ran");
             this.mapObject = map;
+            this.unitMapObject = new Map();
             // this.findRoute(instanceId, map);
             // this.pathInstructions(list, currentTile, map, instanceId);
         },
@@ -124,7 +132,6 @@
             }
             var sceneHeight = map[0].length;            
             while (currentTile.y + falling.y < sceneHeight) {
-                // SHOULD FALLING REMEMBER TILES??????????????? no, can block jump paths?
                 var sum = currentTile.y + falling.y;
                 // needs to check coord for being within map scene
                 if (!map[currentTile.x][sum].visitCondition && map[currentTile.x][sum].wallID == -1) {
@@ -133,7 +140,6 @@
                         y: sum, 
                         direction: this.movement.fallDown
                     }
-                    // this.pushTile(queue, list, nextTile, currentTile, map);
                     list.push({
                         x: nextTile.x, 
                         y: nextTile.y,
@@ -142,11 +148,7 @@
                         parenty: currentTile.y,
                     });
                     currentTile.y = sum;
-
                     map[nextTile.x][nextTile.y].visitCondition = true;
-                    // if (!this.isWithinJumpRange(currentTile.x, sum)) {
-                        
-                    // }
                 } else {
                     break;
                 }
@@ -166,6 +168,7 @@
                     case this.movement.climbUp:
                         // climb up ladders
                         if (!map[nextTile[i].x][nextTile[i].y].visitCondition && map[currentTile.x][currentTile.y].wallID == this.ladderWallId) {
+                            Agtk.log("ladder found at:" + currentTile.x + ", " + currentTile.y)
                             this.pushTile(queue, list, nextTile[i], currentTile, map);
                         }
 
@@ -189,7 +192,8 @@
                         // detects ladder (wallId = 7)
                         if (!map[nextTile[i].x][nextTile[i].y].visitCondition 
                             && (map[nextTile[i].x][nextTile[i].y].wallID == -1 || map[nextTile[i].x][nextTile[i].y].wallID == this.ladderWallId)
-                            && this.isWithinJumpRange(nextTile[i].x, nextTile[i].y)) {
+                            && this.isWithinJumpRange(nextTile[i].x, nextTile[i].y, nextTile[i].direction)
+                        ) {
                             this.pushTile(queue, list, nextTile[i], currentTile, map);
                         }
                     break;
@@ -242,11 +246,15 @@
                 if ((newpath[newpath.length-1].x != path[i].x && newpath[newpath.length-1].y != path[i].y) 
                 || (path[i].direction != this.movement.jump && newpath[newpath.length-1].direction == this.movement.jump)
                 || (path[i].direction == this.movement.jump && newpath[newpath.length-1].direction != this.movement.jump)
+                || (path[i].direction != this.movement.climbUp && newpath[newpath.length-1].direction == this.movement.climbUp)
+                || (path[i].direction == this.movement.climbUp && newpath[newpath.length-1].direction != this.movement.climbUp)
+                || (path[i].direction != this.movement.climbDown && newpath[newpath.length-1].direction == this.movement.climbDown)
+                || (path[i].direction == this.movement.climbDown && newpath[newpath.length-1].direction != this.movement.climbDown)
                 || (i == path.length -1)) {
                     newpath.push(path[i]);
                 }
             }
-            Agtk.log("newpath length: " + newpath.length);
+            Agtk.log("NEWPATH length: " + newpath.length + "--------------------");
             for (var i =0; i < newpath.length; i++) {
                 Agtk.log(newpath[i].x + "," + newpath[i].y + " direction: " + newpath[i].direction);
             }
@@ -273,12 +281,9 @@
 
         pushJumpTiles: function(queue, list, iter, currentTile, map, instanceId) {
             // find max jump height and push tiles to queue and list only if tiles are air tiles
-            var maxHeight = currentTile.y - 17;
-            var maxRight = currentTile.x + 17;
-            var maxLeft = currentTile.x - 17
-            var tileX = currentTile.x;
+            var maxHeight = currentTile.y - this.jumpRange;
+
             for (var tileY = currentTile.y - 1; 
-                    (tileY > 0) && 
                     (tileY > maxHeight) && 
                     (this.isWithinScene(currentTile.x, tileY) && 
                     map[currentTile.x][tileY].wallID == -1); 
@@ -290,27 +295,6 @@
                 }
                 this.pushTile(queue, list, iter, currentTile, map);
                     currentTile = iter;
-            }
-            // if unit jumps to the left 
-            for (var x = tileX; (this.isWithinScene(x, currentTile.y)) && (x > maxLeft) && (map[x][currentTile.y].wallID == -1) && (!map[x][currentTile.y].visitCondition); x--) {
-                var iter = {
-                    x: x,
-                    y: currentTile.y,
-                    direction: this.movement.moveLeft,
-                }
-                this.pushTile(queue, list, iter, currentTile, map);
-                currentTile = iter;
-            }
-            
-            // if unit jumps to the right
-            for (var x = tileX; (this.isWithinScene(x, currentTile.y)) && (x < maxRight) && (map[x][currentTile.y].wallID == -1) && (!map[x][currentTile.y].visitCondition); x++) {
-                var iter = {
-                    x: x,
-                    y: currentTile.y,
-                    direction: this.movement.moveRight,
-                }
-                this.pushTile(queue, list, iter, currentTile, map);
-                currentTile = iter;
             }
         },
 
@@ -389,11 +373,18 @@
                             "moveDistanceEnabled": false,
                         }
                         this.direction.set(instanceId, this.movement.moveRight);
-                        Agtk.objectInstances.get(instanceId).execCommandDirectionMove(args);
                         break;
                     case this.movement.climbUp:
                         var direction = 0;
                         var distance = ydistance;
+                        //  WIP below. Unit swaps to ladder climbing 
+                        var args = {
+                            "direction": 0,
+                            "directionId": -2,
+                            "moveDistance": 0,
+                            "moveDistanceEnabled": false
+                        }
+                        Agtk.objectInstances.get(instanceId).execCommandDirectionMove(args);
                         break;
                     case this.movement.climbDown:
                         var direction = 180;
@@ -413,7 +404,8 @@
                         // this way, the unit maintains its course and can fall into the hole
                         var direction = this.movement.fallDown;
                         var distance = 0;
-                        if (this.isWallContact(8, instanceId)) {
+                        // following needs to be edited, so when object come into contact with side walls it will also trigger
+                        if (this.isWallContact(8, instanceId) || this.isWallContact(2, instanceId) || this.isWallContact(4, instanceId)) {
                             distance = 1;
                         }
                         var args = {
@@ -512,10 +504,6 @@
             }
         },
 
-        isTileVisited: function(x, y){
-            return this.mapObject[x][y].visitCondition;
-        },
-
         moveDistance: function(instanceId, destination) {
             var distance = this.getCurrentLocation(instanceId).x - destination.x;
                 var args = {
@@ -527,19 +515,29 @@
                 Agtk.objectInstances.get(instanceId).execCommandDisplayDirectionMove(args);
         },
 
-        isWithinJumpRange: function(x, y) {
-            for (var j = (y); j <= (y + this.jumpHeight); j++) {
-                for (var i = (x - this.jumpHeight); i <= (x + this.jumpHeight); i++) {
-                    
-                    if (this.isWithinScene(i, j)) {
-                        var xdist = Math.abs(x - i);
-                        var ydist = Math.abs(y - j);
-                        if (this.mapObject[i][j].wallID % 2 == 1
-                            && (xdist * xdist + ydist * ydist) <= (this.jumpHeight * this.jumpHeight)) {
-                                // Agtk.log("location of floor tile: " + i + "," + j + ", wall id of " + this.mapObject[i][j].wallID);
-                                return true;
+        isWithinJumpRange: function(x, y, direction) {
+            for (var j = (y); j <= (y + this.jumpRange); j++) {
+                if (direction == this.movement.moveLeft) {
+                    // if object jumps left
+                    for (var i = (x); i <= (x + this.jumpRange); i++) {
+                        if (this.isWithinScene(i, j)) {
+                            if ((this.mapObject[i][j].wallID % 2 == 1 || this.mapObject[i][j].wallID == this.ladderWallId)
+                                && ((Math.pow((x - i), 2) + Math.pow((y - j), 2)) <= Math.pow(this.jumpRange, 2))) {
+                                    return true;
+                            }
+                        
                         }
-                    
+                    }
+                } else {
+                    // if object jumps right
+                    for (var i = (x - this.jumpRange); i <= (x); i++) {
+                        if (this.isWithinScene(i, j)) {
+                            if ((this.mapObject[i][j].wallID % 2 == 1 || this.mapObject[i][j].wallID == this.ladderWallId)
+                                && ((Math.pow((x - i), 2) + Math.pow((y - j), 2)) <= Math.pow(this.jumpRange, 2))) {
+                                    return true;
+                            }
+                        
+                        }
                     }
                 }
             }
@@ -626,7 +624,8 @@
                 // Agtk.log("The parameter entered for [ActionCommand1] is "+temp+".");              
                 break;
             case 2: // # id: 2
-                global.findPathtoPlayer(instanceId, global.mapObject);
+                global.unitMapObject.set(instanceId, global.mapObject);
+                global.findPathtoPlayer(instanceId, global.unitMapObject.get(instanceId));
                 break;
             case 3:         
                 if (global.list.length != 0 && global.list.get(instanceId) != 0) {
@@ -648,7 +647,6 @@
         valueJson = obj.completeValueJson(index, valueJson, "linkCondition");
         switch(paramId){
             case 1: 
-            // Agtk.log("is this within jump range? " + global.isWithinJumpRange(98, 36));
                 if (global.list.length != 0) {
                     var list = global.list.get(instanceId);
                     var self = global.getCurrentLocation(instanceId);
@@ -662,7 +660,7 @@
                             // short jumps meant for jumping up onto higher platfomrs
                             if (landingTile.direction == global.movement.moveLeft
                                 && ((jumpTile.x - self.x) <= -range)
-                                && (list[2].direction != global.movement.fallDown || Math.abs(list[2].x - self.x) > global.jumpHeight)) {
+                                && (list[2].direction != global.movement.fallDown || Math.abs(list[2].x - self.x) > global.jumpRange)) {
                                     Agtk.log("short left jump, at: " + + self.x + ", " + self.y + " direction: ");
                                     directions = global.movement.moveLeft;  
                                     var args = {
@@ -678,7 +676,7 @@
     
                             if (landingTile.direction == global.movement.moveRight 
                                 && ((self.x - jumpTile.x) <= -range )
-                                && (list[2].direction != global.movement.fallDown || Math.abs(list[2].x - self.x) > global.jumpHeight)
+                                && (list[2].direction != global.movement.fallDown || Math.abs(list[2].x - self.x) > global.jumpRange)
                             ) {
                                     Agtk.log("short right jump, at: " + + self.x + ", " + self.y + " direction: ")
                                     directions = global.movement.moveRight;   
@@ -721,8 +719,23 @@
                 break;
             case 2: // # id: 2
                 Agtk.log("[LinkCondition2] is executed.");
-                var ten = 10;
-                return ten < 5; // # false
+                if (global.list.length != 0) {
+                    var list = global.list.get(instanceId);
+                    var self = global.getCurrentLocation(instanceId);
+                    // checks if unit can jump, will need to account for changing directions when jumping (e.g. moving right then jumping to the left side of a platform above)
+                    if (list.length > 1) {
+                        var jumpTile = list[0];
+                        var landingTile = list[1];
+                        var directions = global.movement.climbUp;
+                        var range = global.range;
+                        if (jumpTile.direction == global.movement.climbUp && Agtk.objectInstances.get(instanceId).variables.AreaAttributeId) {
+                           
+                        }
+                    }       
+    
+                    // due to current pathfinder algorithm, units prefer to fall down and jump immediately back up instead of just jumping over gaps that have a platform below. This condition checks for that issue and orders the unit to jump.
+ 
+                }            
         }
         // Have to the link condition returns a true or false result.
         return false;
