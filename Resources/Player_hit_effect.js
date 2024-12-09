@@ -15,6 +15,51 @@
     
         AllDirectionBit: 0x3DE
     }
+
+    // Agtk.constants.controllers = {
+    //     OperationKeyA: 1,
+    //     OperationKeyB: 2,
+    //     OperationKeyX: 3,
+    //     OperationKeyY: 4,
+    //     OperationKeyR1: 5,
+    //     OperationKeyR2: 6,
+    //     OperationKeyL1: 7,
+    //     OperationKeyL2: 8,
+    //     OperationKeyUp: 9,
+    //     OperationKeyDown: 10,
+    //     OperationKeyLeft: 11,
+    //     OperationKeyRight: 12,
+    //     OperationKeyLeftStickUp: 13,
+    //     OperationKeyLeftStickDown: 14,
+    //     OperationKeyLeftStickLeft: 15,
+    //     OperationKeyLeftStickRight: 16,
+    //     OperationKeyRightStickUp: 17,
+    //     OperationKeyRightStickDown: 18,
+    //     OperationKeyRightStickLeft: 19,
+    //     OperationKeyRightStickRight: 20,
+    //     OperationKeyLeftClick: 21,
+    //     OperationKeyRightClick: 22,
+    //     OperationKeyStart: 23,
+    //     OperationKeySelect: 24,
+    //     OperationKeyHome: 25,
+    //     OperationKeyOk: 26,
+    //     OperationKeyCancel: 27,
+    
+    //     ReservedKeyCodePc_W: 0,
+    //     ReservedKeyCodePc_A: 1,
+    //     ReservedKeyCodePc_S: 2,
+    //     ReservedKeyCodePc_D: 3,
+    //     ReservedKeyCodePc_LeftClick: 4,
+    //     ReservedKeyCodePc_RightClick: 5,
+    //     ReservedKeyCodePc_Up: 10,
+    //     ReservedKeyCodePc_Right: 11,
+    //     ReservedKeyCodePc_Down: 12,
+    //     ReservedKeyCodePc_Left: 13,
+    //     ReservedKeyCodePc_MiddleClick: 22,
+    //     ReservedKeyCodePc_WheelUp: 24,
+    //     ReservedKeyCodePc_WhellDown: 26,
+    //     ReservedKeyCodePc_MousePointer: 28,
+    // };
     
     function hitEffect(objectPart, enemyTop, enemyRight, enemyLeft, enemyBot) {
         getCharacterVariableByName("Declare atk action");
@@ -27,6 +72,11 @@
                 performAction("Nyto Legs(1)", "Jump");
             }
         } else if (isObjectHit(-1)) {
+            var playerID = Agtk.objectInstances.getIdByName(-1, "Nyto Legs(1)");
+            var hpID = Agtk.objectInstances.get(playerID).variables.getIdByName("HP");
+            var hp = Agtk.objectInstances.get(playerID).variables.get(hpID).getValue();
+            Agtk.objectInstances.get(playerID).variables.get(hpID).setValue(hp+1);
+
             if(getCharacterVariableByName("Declare atk action") == movement.TopBit){
                 showParticles(enemyTop, true, 4, 300);
             } else if(getCharacterVariableByName("Declare atk action") == movement.BottomBit) {
@@ -41,6 +91,25 @@
                 showParticles(enemyLeft, true, 4, 300);
             }
         }
+    }
+
+    function areWalkInputsReleased(key1, key2) {
+        var array = new Array(arguments.length);
+
+        for (var iter = 0; iter < arguments.length; iter++) {
+            for(var i = 0; i <= Agtk.controllers.MaxControllerId; i++) {
+                if (Agtk.controllers.getOperationKeyPressed(i, arguments[iter])) {
+                    array[iter] = true;
+                }
+            }
+        }
+
+        for (var i = 0; i < array.length; i++) {
+            if (array[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     function isObjectHit(objectGroup){
@@ -130,6 +199,25 @@
         var actionID = actions.getIdByName(actionName);
         return actions.get(actionID);
     };
+
+    function areInputsPressed(array) {
+        var array = new Array(arguments.length);
+
+        for (var iter = 0; iter < arguments.length; iter++) {
+            for(var i = 0; i <= Agtk.controllers.MaxControllerId; i++) {
+                if (Agtk.controllers.getOperationKeyPressed(i, arguments[iter])) {
+                    array[iter] = true;
+                }
+            }
+        }
+
+        for (var i = 0; i < array.length; i++) {
+            if (array[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
     
 
 
@@ -164,7 +252,7 @@
                     {id: 1,
                         name: "Hit an object: ",
                         type: "AnimationId", 
-                        defaultValue: ""
+                        defaultValue: "",
                     },
                     {id: 2,
                         name: "Hit enemy's topside: ",
@@ -194,9 +282,12 @@
             // # The process is defined in obj.execLinkCondition
             // return []; // if you don't use
             return [
-                {id: 1, name: '[LinkCondition1]', description: 'description', parameter: [
-                    {id: 1, name: 'Number:', type: 'Number', defaultValue: 0}
-                ]},
+                {
+                    id: 1, 
+                    name: 'Check walk inputs', 
+                    description: 'Checks if both left stick left and right directions are not pressed', 
+                    parameter: []
+                },
                 {id: 2, name: '[LinkCondition2]', description: 'description', parameter: []}
             ];
         }
@@ -241,7 +332,6 @@
                 var enemyLeft = obj.getValueJson(valueJson, 4);
                 var enemyBot = obj.getValueJson(valueJson, 5);
                 instanceID = instanceId;
-                Agtk.log("ran here --------------")
                 hitEffect(objectPart, enemyTop, enemyRight, enemyLeft, enemyBot);
                 break;
             case 2: // # id: 2
@@ -258,14 +348,11 @@
         valueJson = obj.completeValueJson(index, valueJson, "linkCondition");
         switch(paramId){
             case 1: // # id: 1
-                Agtk.log("[LinkCondition1] is executed.");
-                var ten = 10;
-                return ten > 5; // # true
+                return areWalkInputsReleased(15, 16);
                 break;
             case 2: // # id: 2
                 Agtk.log("[LinkCondition2] is executed.");
                 var ten = 10;
-                return ten < 5; // # false
                 break;
         }
         // Have to the link condition returns a true or false result.
