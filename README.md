@@ -1,5 +1,5 @@
 # Dreamwalker
-This is the online repo for the video game Dreamwalker. Contains character sheets, code, and much more.
+This is the online repo for the video game Dreamwalker. Contains character sheets and code.
 
 ## Character sheets
 Features unique artstyle that's simplistic and intuitive to understand.
