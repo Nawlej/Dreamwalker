@@ -1,7 +1,7 @@
 # Dreamwalker
 
 **About**:
-This is the online repo for the video game Dreamwalker.
+This is the online repo for the video game Dreamwalker. Contains character sheets, code, and c
 
 
 
