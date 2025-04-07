@@ -78,7 +78,7 @@
             // this.pathInstructions(list, currentTile, map, instanceId);
         },
 
-        findPathtoObject: function(instanceId, targetObjectID, map) {
+        findPathtoObject: function(instanceId, targetInstanceID, map) {
             // this finds the unit's current xy tile coord
             var self = Agtk.objectInstances.get(instanceId).variables;
             var xinit = Math.floor(self.get(self.XId).getValue() / Agtk.settings.tileWidth);
@@ -112,12 +112,12 @@
             map[xinit][yinit].visitCondition = true;
 
             // Locate target object
-            var targetObj = Agtk.objectInstances.get(targetObjectID).variables;
+            var targetObj = Agtk.objectInstances.get(targetInstanceID).variables;
             var targetCoord = {
                 x: Math.floor(targetObj.get(targetObj.XId).getValue() / Agtk.settings.tileWidth),
                 y: Math.floor(targetObj.get(targetObj.YId).getValue() / Agtk.settings.tileHeight + 2),
             }
-
+            Agtk.log("TARGET ID IS: " + targetInstanceID + "at " + targetCoord.x + "and " + targetCoord.y);
             
             // while loop
             while (queue.length != 0 && !(currentTile.x == targetCoord.x && currentTile.y == targetCoord.y)) {
@@ -128,7 +128,6 @@
                 this.retraceSteps(list, instanceId);
             }
             Agtk.log("Finished running findRoute--------")  
-            Agtk.log(map[24][42].wallID);
         },
 
         // original pathfinding model, DO NOT DELETE
@@ -175,7 +174,7 @@
                 switch (nextTile[i].direction) {
                     case this.movement.Up:
                         // climb up ladders
-                        Agtk.log("wall ID at: " + nextTile[i].x + ", " + nextTile[i].y + "is " + map[nextTile[i].x][nextTile[i].y].wallID);
+                        // Agtk.log("wall ID at: " + nextTile[i].x + ", " + nextTile[i].y + "is " + map[nextTile[i].x][nextTile[i].y].wallID);
                         if (!map[nextTile[i].x][nextTile[i].y].visitCondition 
                             && map[nextTile[i].x][nextTile[i].y].wallID == this.ladderWallBit
                         ) {
@@ -644,10 +643,25 @@
             return false;
         },
 
-        findLockedObjectId: function() {
+        findLockedObjectId: function(instanceId) {
             // finds the ID of the locked object by searching for LockedObjectID variable
             var objId = Agtk.objectInstances.get(instanceId).variables.getIdByName("LockedObjectID");
             return Agtk.objectInstances.get(instanceId).variables.get(objId).getValue();
+        },
+
+        objectIsTooClose: function(distance) {
+            var args = {
+                "otherDirections": false,
+                "objectDirection": true,
+                "directionBit": 990,
+                "distanceType": 2,
+                "distance": distance,
+                "objectType": 0,
+                "objectTypeByType": 0,
+                "objectGroup": 4,
+                "objectId": -1,
+            }
+            return Agtk.objectInstances.get(instanceId).isObjectNear(args);
         }
     }
 	
@@ -676,10 +690,18 @@
             // return []; // if you don't use
             return [
                 {id: 1, name: 'Map the scene', description: 'Finds all the tiles in layers 2 and 3 and remembers their wall detection.'},
-                {id: 2, name: 'Find route to player', description: 'Find the shortest route to the player. This is the basic pathfinding algorithm.'}, 
-                {id: 3, name: 'Move to location', description: 'Unit moves along the path to location. Requires running Find route to player.'},
-                {id: 4, name: 'Travel jump distance', description: 'Handles unit jump distance. Requires running Find route to player. WIP: allow user to select location coord.', 
-                parameter: [{id: 1, name: 'X Coord', type: 'Number', minimumValue: 0, defaultValue: 0}, {id: 2, name: 'Y Coord', type: 'Number', minimumValue: 0, defaultValue: 0}]},
+                {id: 2, name: 'Find path to player', description: 'Find the shortest route to the player. This does not move the unit.'}, 
+                {id: 3, name: 'Find path to locked target', description: 'Find the shortest route to the locked target. This does not move the unit.',
+                    parameter: [
+                        {id: 1, 
+                            name: "Target: ", 
+                            type: "SwitchVariableObjectId",
+                            option: ["LockedObject", "ParentObject"],
+                            defaultValue: -1,
+                        },
+                    ]
+                },
+                {id: 4, name: 'Move to location', description: 'Moves the unit along the path to location. Requires running \'Find route to player\' or \'Find route to locked target\' beforehand.'},
             ];
         } else if(category == 'linkCondition'){
             // # Parameters of link conditions.
@@ -738,18 +760,27 @@
             case 2: // # id: 2
                 global.unitMapObject.set(instanceId, global.mapObject);
 
-                // Locate player object ID and find path to player * Player Body
-                var playerID = Agtk.objectInstances.getIdByName(-1, "Nyto Body(1)")
+                // Locate player object ID and find path to player. Returning a -1 will cause Agtk.objectInstances.get(-1) to return the player id which means units will lock onto the player if they fail to lock onto a target.
+                var playerID = Agtk.objectInstances.getIdByName(-1, "Player")
                 global.findPathtoObject(instanceId, playerID, global.unitMapObject.get(instanceId));
                 break;
-            case 3:         
+            case 3:        
+                global.unitMapObject.set(instanceId, global.mapObject);
+
+                // Locate the locked target object. If a unit cannot locate the target, it will auto target the player so leave in the if statement.
+                // var playerID = Agtk.objectInstances.getIdByName(-1, "Player") 
+
+                var targetInstanceID = obj.getValueJson(valueJson, 1);
+                var name = Agtk.objects.get(144).name; // HOW TO GET THE NAME OF A LOCKED OBJECT????????
+                targetInstanceID = Agtk.objectInstances.get(targetInstanceID)
+                Agtk.log("target ID is: " + global.findLockedObjectId(instanceId))
+                global.findPathtoObject(instanceId, global.findLockedObjectId(instanceId), global.unitMapObject.get(instanceId));
+                break;
+            case 4:
                 if (global.list.length != 0 && global.list.get(instanceId) != 0) {
                     global.moveToLocation(instanceId, global.list.get(instanceId));
                     return Agtk.constants.actionCommands.commandBehavior.CommandBehaviorLoop;
                 }
-                break;
-            case 4:
-                global.moveDistance(instanceId, global.list.get(instanceId)[1]);
                 break;
         }
         // # The behavior of the action after executing the command is selected.
@@ -827,6 +858,11 @@
                                 list.shift();
                                 return true;
                             }
+
+                            // for jumping over terrain objects
+                            if (global.objectIsTooClose(400) && (global.isWallTouching(8, instanceId) || global.isObjectTouching(8, instanceId))) {
+
+                            }
                         }
                     }       
     
@@ -856,7 +892,7 @@
                         if ((currentTile.direction == global.movement.Up || currentTile.direction == global.movement.Down)
                             && Agtk.objectInstances.get(instanceId).variables.get(index).getValue() == global.ladderID
                         ) {
-                            Agtk.log("UNIT JUMP CONDITONS WERE MET");
+                            Agtk.log("CLIMB LADDER CONDITIONS ARE MET");
                             return true;
                         }
                     }       

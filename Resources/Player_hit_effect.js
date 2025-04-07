@@ -15,6 +15,8 @@
     
         AllDirectionBit: 0x3DE
     }
+    var PLAYER_BODY = "Player Body"
+    var PLAYER_LEGS = "Player Legs"
 
     // Agtk.constants.controllers = {
     //     OperationKeyA: 1,
@@ -61,34 +63,38 @@
     //     ReservedKeyCodePc_MousePointer: 28,
     // };
     
-    function hitEffect(objectPart, enemyTop, enemyRight, enemyLeft, enemyBot) {
-        getCharacterVariableByName("Declare atk action");
+    function hitEffect(objectPart, enemyTop, enemyRight, enemyLeft, enemyBot, trackpath) {
+        direction = getCharacterVariableByName("Declare atk action");
+        connectionID = findAnimationTrackID(trackpath);
+
         if(isObjectHit(4)){
-            Agtk.log("instance id " + instanceID);
-            Agtk.log("animation name: " + objectPart);
-            // default connection id = 4
-            showParticles(objectPart, true, 4, 300);
-            if (getCharacterVariableByName("Declare atk action") == movement.BottomBit) {
-                performAction("Nyto Legs(1)", "Jump");
+            // if player hits an object, show sparks
+            showParticles(objectPart, true, connectionID, 300);
+            if (direction == movement.BottomBit) {
+                // perform a jump if player hits an object with a down attack
+                performAction(PLAYER_LEGS, "Jump");
             }
         } else if (isObjectHit(-1)) {
-            var playerID = Agtk.objectInstances.getIdByName(-1, "Nyto Legs(1)");
+            // if player hits an enemy, increase player hp 
+            var playerID = Agtk.objectInstances.getIdByName(-1, PLAYER_BODY);
             var hpID = Agtk.objectInstances.get(playerID).variables.getIdByName("HP");
             var hp = Agtk.objectInstances.get(playerID).variables.get(hpID).getValue();
             Agtk.objectInstances.get(playerID).variables.get(hpID).setValue(hp+1);
 
-            if(getCharacterVariableByName("Declare atk action") == movement.TopBit){
-                showParticles(enemyTop, true, 4, 300);
-            } else if(getCharacterVariableByName("Declare atk action") == movement.BottomBit) {
-                performAction("Nyto Legs(1)", "Jump");
-                showParticles(enemyBot, true, 4, 300);
-
+            // determine attack direction
+            if(direction == movement.TopBit){
+                // up attack
+                showParticles(enemyTop, true, connectionID, 300);
+            } else if(direction == movement.BottomBit) {
+                // down attack
+                performAction(PLAYER_LEGS, "Jump");
+                showParticles(enemyBot, true, connectionID, 300);
             } else if (facingDirection(movement.RightBit)){
-                //facing right
-                showParticles(enemyRight, true, 4, 300);
+                // right attack
+                showParticles(enemyRight, true, connectionID, 300);
             } else {
-                //facing left
-                showParticles(enemyLeft, true, 4, 300);
+                // left attack
+                showParticles(enemyLeft, true, connectionID, 300);
             }
         }
     }
@@ -132,13 +138,12 @@
             "particleId": particleID,
             "positionType": 0,
             "useConnect": useConnect,
-            "connectId": connectId, // default connection id = 4
+            "connectId": connectId, 
             "adjustX": 0,
             "adjustY": 0,
             "duration300": duration300,
             "durationUnlimited": false
         }
-        Agtk.log("Hit connected--------------");
         Agtk.objectInstances.get(instanceID).execCommandParticleShow(args);
     }
 
@@ -152,7 +157,6 @@
             "objectGroup": 0,
             "objectId": -2
         }
-        Agtk.log("ran directions ----------");
         var condition = Agtk.objectInstances.get(instanceID).isObjectFacingDirection(args);
         if(condition){
             return true;
@@ -172,7 +176,6 @@
     function getCharacterVariableByName(string) {
         var varID = Agtk.objectInstances.get(instanceID).variables.getIdByName(string);
         var value = Agtk.objectInstances.get(instanceID).variables.get(varID).getValue();
-        Agtk.log("variable value: " + value);
         return value;
     }
 
@@ -189,38 +192,18 @@
             return this.action;
         },
     }
-    function getObjectByName(objectName) {
-        var id = Agtk.objects.getIdByName(objectName);
-        var object = Agtk.objects.get(id);
-        return object;
-    };
 
-    function getActionByName(actionName) {
-        var actionID = actions.getIdByName(actionName);
-        return actions.get(actionID);
-    };
-
-    function areInputsPressed(array) {
-        var array = new Array(arguments.length);
-
-        for (var iter = 0; iter < arguments.length; iter++) {
-            for(var i = 0; i <= Agtk.controllers.MaxControllerId; i++) {
-                if (Agtk.controllers.getOperationKeyPressed(i, arguments[iter])) {
-                    array[iter] = true;
-                }
-            }
-        }
-
-        for (var i = 0; i < array.length; i++) {
-            if (array[i]) {
-                return false;
-            }
-        }
-        return true;
+    function findAnimationTrackID(trackpath) {
+        path = trackpath.split("/");
+        id = Agtk.animations.getIdByName(path[0]); 
+        motions = Agtk.animations.get(id).motions
+        
+        motionID = motions.getIdByName(path[1]);
+        directionID = motions.get(motionID).directions.getIdByName(path[2]);
+        
+        trackID = motions.get(motionID).directions.get(directionID).tracks.getIdByName(path[3]);
+        return trackID;
     }
-    
-
-
 
     obj.getInfo = function(category){
         if(category == 'name'){
@@ -272,6 +255,11 @@
                     {id: 5,
                         name: "Hit enemy's downside: ",
                         type: "AnimationId",
+                        defaultValue: "",
+                    },
+                    {id: 6,
+                        name: "Attack Animation Path: ",
+                        type: "String",
                         defaultValue: "",
                     },
                 ]},
@@ -331,8 +319,9 @@
                 var enemyRight = obj.getValueJson(valueJson, 3);
                 var enemyLeft = obj.getValueJson(valueJson, 4);
                 var enemyBot = obj.getValueJson(valueJson, 5);
+                var trackpath = obj.getValueJson(valueJson, 6);
                 instanceID = instanceId;
-                hitEffect(objectPart, enemyTop, enemyRight, enemyLeft, enemyBot);
+                hitEffect(objectPart, enemyTop, enemyRight, enemyLeft, enemyBot, trackpath);
                 break;
             case 2: // # id: 2
                 Agtk.log("[ActionCommand2] is executed.");
